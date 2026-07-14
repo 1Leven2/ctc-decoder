@@ -1,0 +1,26 @@
+# 构建产物
+build/
+*.o
+*.so
+*.a
+*.pyc
+__pycache__/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python
+*.egg-info/
+dist/
+.eggs/
+
+# 依赖缓存
+_deps/
+
+# 系统文件
+.DS_Store
+Thumbs.db
