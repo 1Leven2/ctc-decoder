@@ -18,6 +18,8 @@
 #include <cmath>
 #include <limits>
 
+#include "ctc/simd_utils.h"
+
 namespace ctc {
 
 /* ═══════════════════════════════════════════════════════════════
@@ -193,13 +195,14 @@ void PrefixBeamSearch::AdvanceDecoding(const float *log_probs, int vocab_size,
    * 低于 max_logp - cutoff_threshold 的 token 直接跳过。
    * 仅此一步即可在 V=5000 时过滤掉 90%+ 的无效扩展。 */
 
-  float max_logp = -std::numeric_limits<float>::infinity();
-  for (int i = 0; i < vocab_size; ++i) {
-    if (log_probs[i] > max_logp)
-      max_logp = log_probs[i];
-  }
+  auto [max_logp, max_idx] = ctc::simd::simd_argmax(log_probs, vocab_size);
+  (void)max_idx;
   float cutoff = max_logp - opts_.cutoff_threshold;
   float blank_logp = log_probs[opts_.blank_id];
+
+  // SIMD 阈值预筛选：先批量找出所有 >= cutoff 的 token 索引，
+  // 内层循环只迭代这些候选 token，消除逐 token 的 if (logp < cutoff) 分支。
+  auto candidates = ctc::simd::simd_threshold_filter(log_probs, vocab_size, cutoff);
 
   /* ─── 2. 遍历当前 beam，扩展每个前缀 ─────────────── */
 
@@ -216,17 +219,13 @@ void PrefixBeamSearch::AdvanceDecoding(const float *log_probs, int vocab_size,
     cur->new_score.b =
         LogAdd(cur->new_score.b, cur->score.Total() + blank_logp);
 
-    /* ─── 2b. 扩展到每个非 blank token ─────────────── */
+    /* ─── 2b. 扩展到非 blank token（仅迭代阈值预筛选通过的候选） ─── */
 
-    for (int c = 0; c < vocab_size; ++c) {
+    for (int c : candidates) {
       if (c == opts_.blank_id)
         continue;
 
       float logp_c = log_probs[c];
-
-      // 相对阈值剪枝：跳过该帧概率极低的 token
-      if (logp_c < cutoff)
-        continue;
 
       /* ── 情况 (a): c != 末尾，创建新前缀 ──
        *

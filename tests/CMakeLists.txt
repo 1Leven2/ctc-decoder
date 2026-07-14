@@ -22,3 +22,8 @@ gtest_discover_tests(test_greedy)
 add_executable(test_beam test_beam.cpp)
 target_link_libraries(test_beam PRIVATE ctc_core GTest::gtest_main)
 gtest_discover_tests(test_beam)
+
+# ─── SIMD 工具函数单元测试 ────────────────────────────────
+add_executable(test_simd test_simd.cpp)
+target_link_libraries(test_simd PRIVATE ctc_core GTest::gtest_main)
+gtest_discover_tests(test_simd)

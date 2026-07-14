@@ -1,7 +1,6 @@
 #include "ctc/greedy_decoder.h"
 
-#include <algorithm>
-#include <limits>
+#include "ctc/simd_utils.h"
 
 namespace ctc {
 
@@ -30,12 +29,9 @@ void GreedyDecoder::Step(const float *log_probs, int vocab_size) {
   if (vocab_size <= 0)
     return;
 
-  // 找到当前帧概率最大的 token（argmax）
-  // std::max_element 对原始数组做 O(V) 线性扫描
-  int best_token =
-      static_cast<int>(std::max_element(log_probs, log_probs + vocab_size) -
-                       log_probs); // 获取的是指针差值，转换为索引
-  float best_score = log_probs[best_token];
+  // SIMD 向量化 argmax：一次加载 8 个 float（AVX2）并行比较，
+  // 比标量 std::max_element 更充分利用 CPU 数据并行能力
+  auto [best_score, best_token] = ctc::simd::simd_argmax(log_probs, vocab_size);
 
   // 累加对数概率
   total_score_ += best_score;

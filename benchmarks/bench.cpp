@@ -13,6 +13,7 @@
 
 #include "ctc/greedy_decoder.h"
 #include "ctc/prefix_beam_search.h"
+#include "ctc/simd_utils.h"
 
 using namespace ctc;
 
@@ -162,5 +163,99 @@ static void BM_Beam_T100_V128_Beam20(benchmark::State& state) {
   state.SetItemsProcessed(state.iterations() * T);
 }
 BENCHMARK(BM_Beam_T100_V128_Beam20);
+
+/* ═══════════════════════════════════════════════════════════════
+ *  SIMD 底层函数基准（对比标量版本）
+ * ═══════════════════════════════════════════════════════════════ */
+
+// 标量 argmax 参考
+static std::pair<float, int> ScalarArgmax(const float *data, int n) {
+  float max_val = data[0];
+  int max_idx = 0;
+  for (int i = 1; i < n; ++i) {
+    if (data[i] > max_val) {
+      max_val = data[i];
+      max_idx = i;
+    }
+  }
+  return {max_val, max_idx};
+}
+
+// 标量阈值过滤参考
+static std::vector<int> ScalarThreshold(const float *data, int n, float thr) {
+  std::vector<int> out;
+  out.reserve(n / 4);
+  for (int i = 0; i < n; ++i) {
+    if (data[i] >= thr)
+      out.push_back(i);
+  }
+  return out;
+}
+
+static void BM_SIMD_Argmax_V5000(benchmark::State &state) {
+  constexpr int V = 5000;
+  std::vector<float> log_probs(V);
+  std::mt19937 rng(42);
+  std::uniform_real_distribution<float> dist(-10.0f, 10.0f);
+  for (auto &v : log_probs)
+    v = dist(rng);
+
+  for (auto _ : state) {
+    auto result = ctc::simd::simd_argmax(log_probs.data(), V);
+    benchmark::DoNotOptimize(result);
+  }
+  state.SetItemsProcessed(state.iterations() * V);
+}
+BENCHMARK(BM_SIMD_Argmax_V5000);
+
+static void BM_Scalar_Argmax_V5000(benchmark::State &state) {
+  constexpr int V = 5000;
+  std::vector<float> log_probs(V);
+  std::mt19937 rng(42);
+  std::uniform_real_distribution<float> dist(-10.0f, 10.0f);
+  for (auto &v : log_probs)
+    v = dist(rng);
+
+  for (auto _ : state) {
+    auto result = ScalarArgmax(log_probs.data(), V);
+    benchmark::DoNotOptimize(result);
+  }
+  state.SetItemsProcessed(state.iterations() * V);
+}
+BENCHMARK(BM_Scalar_Argmax_V5000);
+
+static void BM_SIMD_Threshold_V5000(benchmark::State &state) {
+  constexpr int V = 5000;
+  std::vector<float> log_probs(V);
+  std::mt19937 rng(42);
+  std::uniform_real_distribution<float> dist(-10.0f, -0.1f);
+  for (auto &v : log_probs)
+    v = dist(rng);
+  log_probs[100] = -0.01f; // 确保有少量通过阈值
+
+  for (auto _ : state) {
+    auto result = ctc::simd::simd_threshold_filter(log_probs.data(), V, -1.0f);
+    benchmark::DoNotOptimize(result);
+  }
+  state.SetItemsProcessed(state.iterations() * V);
+}
+BENCHMARK(BM_SIMD_Threshold_V5000);
+
+static void BM_Scalar_Threshold_V5000(benchmark::State &state) {
+  constexpr int V = 5000;
+  std::vector<float> log_probs(V);
+  std::mt19937 rng(42);
+  std::uniform_real_distribution<float> dist(-10.0f, -0.1f);
+  for (auto &v : log_probs)
+    v = dist(rng);
+  log_probs[100] = -0.01f;
+
+  for (auto _ : state) {
+    auto result = ScalarThreshold(log_probs.data(), V, -1.0f);
+    benchmark::DoNotOptimize(result);
+  }
+  state.SetItemsProcessed(state.iterations() * V);
+}
+BENCHMARK(BM_Scalar_Threshold_V5000);
 
 BENCHMARK_MAIN();
