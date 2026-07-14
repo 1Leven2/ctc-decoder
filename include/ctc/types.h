@@ -51,6 +51,6 @@ struct DecodeResult {
   std::vector<int> timestamps;
 };
 
-}  // namespace ctc
+} // namespace ctc
 
-#endif  // CTC_TYPES_H_
+#endif // CTC_TYPES_H_

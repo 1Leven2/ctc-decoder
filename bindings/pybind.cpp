@@ -14,6 +14,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -175,12 +176,12 @@ class PyGreedyDecoder {
  */
 class PyPrefixBeamSearch {
  public:
-  explicit PyPrefixBeamSearch(int beam_size = 10, int n_best = 1)
-      : opts_{}, decoder_(opts_) {
-    opts_.beam_size = beam_size;
-    opts_.n_best = n_best;
-    opts_.blank_id = 0;
-    decoder_ = ctc::PrefixBeamSearch(opts_);
+  explicit PyPrefixBeamSearch(int beam_size = 10, int n_best = 1) {
+    ctc::DecoderOptions opts;
+    opts.beam_size = beam_size;
+    opts.n_best = n_best;
+    opts.blank_id = 0;
+    decoder_ = std::make_unique<ctc::PrefixBeamSearch>(opts);
   }
 
   void Step(py::array_t<float, py::array::c_style | py::array::forcecast> log_probs) {
@@ -193,12 +194,12 @@ class PyPrefixBeamSearch {
 
     {
       py::gil_scoped_release release;
-      decoder_.Step(data, vocab_size);
+      decoder_->Step(data, vocab_size);
     }
   }
 
   py::list Results(int n = 1) {
-    auto cpp_results = decoder_.Results(n);
+    auto cpp_results = decoder_->Results(n);
     py::list out;
     for (const auto& r : cpp_results) {
       out.append(ResultToDict(r));
@@ -206,11 +207,10 @@ class PyPrefixBeamSearch {
     return out;
   }
 
-  void Reset() { decoder_.Reset(); }
+  void Reset() { decoder_->Reset(); }
 
  private:
-  ctc::DecoderOptions opts_;
-  ctc::PrefixBeamSearch decoder_;
+  std::unique_ptr<ctc::PrefixBeamSearch> decoder_;
 };
 
 /* ═══════════════════════════════════════════════════════════════

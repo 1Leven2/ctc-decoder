@@ -6,11 +6,11 @@
 namespace ctc {
 
 GreedyDecoder::GreedyDecoder(int blank_id)
-    : blank_id_(blank_id), prev_token_(-1), total_score_(0.0f), frame_count_(0) {}
+    : blank_id_(blank_id), prev_token_(-1), total_score_(0.0f),
+      frame_count_(0) {}
 
-std::vector<DecodeResult> GreedyDecoder::Decode(const float* log_probs,
-                                                  int num_frames,
-                                                  int vocab_size) {
+std::vector<DecodeResult>
+GreedyDecoder::Decode(const float *log_probs, int num_frames, int vocab_size) {
   // 重置内部状态，准备新一轮解码
   Reset();
 
@@ -26,13 +26,15 @@ std::vector<DecodeResult> GreedyDecoder::Decode(const float* log_probs,
   return Results(1);
 }
 
-void GreedyDecoder::Step(const float* log_probs, int vocab_size) {
-  if (vocab_size <= 0) return;
+void GreedyDecoder::Step(const float *log_probs, int vocab_size) {
+  if (vocab_size <= 0)
+    return;
 
   // 找到当前帧概率最大的 token（argmax）
   // std::max_element 对原始数组做 O(V) 线性扫描
-  int best_token = static_cast<int>(
-      std::max_element(log_probs, log_probs + vocab_size) - log_probs);
+  int best_token =
+      static_cast<int>(std::max_element(log_probs, log_probs + vocab_size) -
+                       log_probs); // 获取的是指针差值，转换为索引
   float best_score = log_probs[best_token];
 
   // 累加对数概率
@@ -41,7 +43,8 @@ void GreedyDecoder::Step(const float* log_probs, int vocab_size) {
   /* ─── CTC 合并规则 ───────────────────────────────────────
    *
    * 条件 1: token != blank  — 过滤所有空白符
-   * 条件 2: token != prev   — 相邻重复合并（连续相同非 blank token 只保留第一个）
+   * 条件 2: token != prev   — 相邻重复合并（连续相同非 blank token
+   * 只保留第一个）
    *
    * 注意：即使遇到 blank，prev_token_ 也会更新为 blank_id，
    *       这样才能正确处理序列 [a, <b>, a] 的情况 —— blank 打断了重复，
@@ -77,4 +80,4 @@ void GreedyDecoder::Reset() {
   frame_count_ = 0;
 }
 
-}  // namespace ctc
+} // namespace ctc
