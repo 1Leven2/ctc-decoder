@@ -27,3 +27,8 @@ gtest_discover_tests(test_beam)
 add_executable(test_simd test_simd.cpp)
 target_link_libraries(test_simd PRIVATE ctc_core GTest::gtest_main)
 gtest_discover_tests(test_simd)
+
+# ─── 线程池 / 批量解码 / C API 单元测试 ──────────────────
+add_executable(test_batch test_batch.cpp)
+target_link_libraries(test_batch PRIVATE ctc_core GTest::gtest_main)
+gtest_discover_tests(test_batch)

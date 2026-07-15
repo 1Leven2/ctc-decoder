@@ -14,3 +14,7 @@ endif()
 add_executable(ctc_bench bench.cpp)
 target_link_libraries(ctc_bench PRIVATE ctc_core benchmark::benchmark)
 target_compile_options(ctc_bench PRIVATE $<$<CONFIG:Release>:-O3>)
+
+add_executable(ctc_bench_batch bench_batch.cpp)
+target_link_libraries(ctc_bench_batch PRIVATE ctc_core benchmark::benchmark)
+target_compile_options(ctc_bench_batch PRIVATE $<$<CONFIG:Release>:-O3>)

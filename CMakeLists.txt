@@ -26,6 +26,9 @@ endif()
 add_library(ctc_core STATIC
     src/greedy_decoder.cpp
     src/prefix_beam_search.cpp
+    src/thread_pool.cpp
+    src/batch_decoder.cpp
+    src/ctc_api.cpp
 )
 target_include_directories(ctc_core PUBLIC
     ${CMAKE_SOURCE_DIR}/include
@@ -50,6 +53,7 @@ target_compile_options(_ctc_decoder PRIVATE
 # ─── 选项：测试与基准（默认关闭，需要时用 -DBUILD_TESTS=ON） ──
 option(BUILD_TESTS "Build unit tests" OFF)
 option(BUILD_BENCHMARKS "Build performance benchmarks" OFF)
+option(BUILD_SHARED_LIB "Build shared library (libctc_decoder.so) with C API" OFF)
 
 if(BUILD_TESTS)
     enable_testing()
@@ -60,5 +64,23 @@ if(BUILD_BENCHMARKS)
     add_subdirectory(benchmarks)
 endif()
 
+# ─── 共享库：libctc_decoder.so（C API） ─────────────────
+if(BUILD_SHARED_LIB)
+    add_library(ctc_decoder SHARED src/ctc_shim.cpp)
+    target_link_libraries(ctc_decoder PRIVATE
+        -Wl,--whole-archive ctc_core -Wl,--no-whole-archive
+    )
+    target_include_directories(ctc_decoder PUBLIC ${CMAKE_SOURCE_DIR}/include)
+    set_target_properties(ctc_decoder PROPERTIES
+        VERSION ${PROJECT_VERSION}
+        SOVERSION 1
+        C_VISIBILITY_PRESET default
+    )
+endif()
+
 # ─── 安装 ──────────────────────────────────────────────
 install(TARGETS _ctc_decoder DESTINATION .)
+if(BUILD_SHARED_LIB)
+    install(TARGETS ctc_decoder DESTINATION lib)
+    install(FILES include/ctc/ctc_api.h DESTINATION include/ctc)
+endif()
